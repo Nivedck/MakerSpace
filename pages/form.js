@@ -4,6 +4,20 @@ import Link from 'next/link';
 
 const PURPOSES = [ 'Work', 'Project', 'Maintenance', 'Visit' ];
 const BRANCHES = ['IT', 'CS', 'CE', 'ME', 'EC', 'EE', 'CB', 'AI'];
+//const COLLEGE_COORDS = { lat: 12.5041, lng: 75.0808 }; //LBS Cordinates
+const COLLEGE_COORDS = { lat: 12.419475130348673, lng: 75.18879145754411}; // Kodoth (For testing)
+const GEOFENCE_RADIUS_M = 100;
+
+function distanceMeters(a, b) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 
 export default function FormPage() {
   const router = useRouter();
@@ -17,12 +31,51 @@ export default function FormPage() {
     purpose: PURPOSES[0] 
   });
   const [err, setErr] = useState(null);
+  const [geoOk, setGeoOk] = useState(false);
+  const [geoError, setGeoError] = useState('');
+  const [geoPending, setGeoPending] = useState(true);
 
   useEffect(() => {
     if (type && type !== 'student' && type !== 'staff') {
       router.push('/checkin-type');
     }
   }, [type, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!('geolocation' in navigator)) {
+      setGeoError('Location is required to check in.');
+      setGeoPending(false);
+      return () => {};
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (cancelled) return;
+        const dist = distanceMeters(
+          { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          COLLEGE_COORDS
+        );
+        if (dist <= GEOFENCE_RADIUS_M) {
+          setGeoOk(true);
+          setGeoError('');
+        } else {
+          setGeoOk(false);
+          setGeoError('You must be on campus to check in.');
+        }
+        setGeoPending(false);
+      },
+      (e) => {
+        if (cancelled) return;
+        setGeoError('Location permission is required to check in.');
+        setGeoPending(false);
+        console.error('Geolocation error', e);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function onChange(e) {
     let value = e.target.value;
@@ -62,6 +115,10 @@ export default function FormPage() {
 
   function submit(e) {
     e.preventDefault();
+    if (!geoOk) {
+      setErr(geoError || 'Location check failed. Please enable location.');
+      return;
+    }
     const error = validate();
     if (error) {
       setErr(error);
@@ -152,9 +209,10 @@ export default function FormPage() {
         </div>
         
         {err && <div className="error">{err}</div>}
+        {geoPending ? <div className="muted">Checking your location...</div> : !geoOk && geoError && <div className="error">{geoError}</div>}
         
         <div className="footer-actions">
-          <button type="submit" className="btn btn-primary">Continue to Photo</button>
+          <button type="submit" className="btn btn-primary" disabled={geoPending || !geoOk}>Continue to Photo</button>
           <Link href="/checkin-type" className="btn btn-outline">Back</Link>
         </div>
       </form>

@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 function useApi(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
   
   useEffect(() => {
     const fetch = async () => {
@@ -18,9 +19,9 @@ function useApi(path) {
       setLoading(false);
     };
     fetch();
-  }, [path]);
+  }, [path, tick]);
   
-  return { data, loading };
+  return { data, loading, refresh: () => setTick(t => t + 1) };
 }
 
 function formatTime(ts) {
@@ -74,10 +75,32 @@ export default function Dashboard() {
   const [tab, setTab] = useState('live');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [forceCheckoutId, setForceCheckoutId] = useState(null);
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    const m = `${d.getMonth() + 1}`.padStart(2, '0');
+    return `${d.getFullYear()}-${m}`;
+  });
+  const [exportingMonth, setExportingMonth] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('ms_admin_token');
+    if (!token) {
+      router.replace('/admin/login');
+    }
+  }, [router]);
 
   const live = useApi('/api/admin/live');
   const today = useApi('/api/admin/today');
   const stats = useApi('/api/admin/stats');
+
+  useEffect(() => {
+    const unauthorized = live.data?.error === 'Unauthorized' || today.data?.error === 'Unauthorized' || stats.data?.error === 'Unauthorized';
+    if (unauthorized) {
+      logout();
+    }
+  }, [live.data, today.data, stats.data]);
 
   function logout() {
     localStorage.removeItem('ms_admin_token');
@@ -109,6 +132,63 @@ export default function Dashboard() {
 
   const currentData = tab === 'live' ? live.data?.sessions : today.data?.sessions;
   const filtered = applyFilters(currentData);
+
+  async function handleForceCheckout(sessionId) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ms_admin_token') : null;
+    if (!token) {
+      logout();
+      return;
+    }
+
+    setForceCheckoutId(sessionId);
+    try {
+      const res = await window.fetch('/api/admin/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ sessionId })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to force check-out');
+      }
+
+      live.refresh();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Manual check-out failed');
+    } finally {
+      setForceCheckoutId(null);
+    }
+  }
+
+  async function handleExportMonthly() {
+    setExportError('');
+    setExportingMonth(true);
+    try {
+      const token = localStorage.getItem('ms_admin_token');
+      if (!token) {
+        logout();
+        return;
+      }
+      const res = await window.fetch(`/api/admin/monthly?month=${encodeURIComponent(month)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        throw new Error(j.error || 'Export failed');
+      }
+      exportCSV(j.sessions || []);
+    } catch (err) {
+      console.error(err);
+      setExportError(err.message || 'Export failed');
+    } finally {
+      setExportingMonth(false);
+    }
+  }
 
   return (
     <main className="screen">
@@ -176,6 +256,26 @@ export default function Dashboard() {
                     <span className="chip">{count}</span>
                   </div>
                 ))}
+              </div>
+              <div className="card" style={{background:'#1b1f2a', gap:'12px', flexDirection:'column'}}>
+                <div className="label">Monthly export</div>
+                <div className="row" style={{gap:'8px', alignItems:'center'}}>
+                  <input
+                    type="month"
+                    className="input"
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    style={{maxWidth:'200px'}}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleExportMonthly}
+                    disabled={exportingMonth}
+                  >
+                    {exportingMonth ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
+                {exportError && <div className="error">{exportError}</div>}
               </div>
             </>
           )}
@@ -270,6 +370,18 @@ export default function Dashboard() {
                   <div className="row">
                     <span className="muted">Elapsed</span>
                     <strong style={{color:'var(--accent)'}}>{timeSince(s.check_in_time)}</strong>
+                  </div>
+                )}
+                {tab === 'live' && s.status === 'open' && (
+                  <div className="row" style={{justifyContent:'flex-end'}}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleForceCheckout(s.id)}
+                      disabled={forceCheckoutId === s.id}
+                      style={{width:'auto'}}
+                    >
+                      {forceCheckoutId === s.id ? 'Checking out...' : 'Force check-out'}
+                    </button>
                   </div>
                 )}
               </div>
