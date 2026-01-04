@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 function useApi(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
   
   useEffect(() => {
     const fetch = async () => {
@@ -18,9 +19,9 @@ function useApi(path) {
       setLoading(false);
     };
     fetch();
-  }, [path]);
+  }, [path, tick]);
   
-  return { data, loading };
+  return { data, loading, refresh: () => setTick(t => t + 1) };
 }
 
 function formatTime(ts) {
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState('live');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [forceCheckoutId, setForceCheckoutId] = useState(null);
 
   const live = useApi('/api/admin/live');
   const today = useApi('/api/admin/today');
@@ -109,6 +111,38 @@ export default function Dashboard() {
 
   const currentData = tab === 'live' ? live.data?.sessions : today.data?.sessions;
   const filtered = applyFilters(currentData);
+
+  async function handleForceCheckout(sessionId) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ms_admin_token') : null;
+    if (!token) {
+      logout();
+      return;
+    }
+
+    setForceCheckoutId(sessionId);
+    try {
+      const res = await window.fetch('/api/admin/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ sessionId })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to force check-out');
+      }
+
+      live.refresh();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Manual check-out failed');
+    } finally {
+      setForceCheckoutId(null);
+    }
+  }
 
   return (
     <main className="screen">
@@ -270,6 +304,18 @@ export default function Dashboard() {
                   <div className="row">
                     <span className="muted">Elapsed</span>
                     <strong style={{color:'var(--accent)'}}>{timeSince(s.check_in_time)}</strong>
+                  </div>
+                )}
+                {tab === 'live' && s.status === 'open' && (
+                  <div className="row" style={{justifyContent:'flex-end'}}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleForceCheckout(s.id)}
+                      disabled={forceCheckoutId === s.id}
+                      style={{width:'auto'}}
+                    >
+                      {forceCheckoutId === s.id ? 'Checking out...' : 'Force check-out'}
+                    </button>
                   </div>
                 )}
               </div>
