@@ -77,9 +77,23 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all');
   const [forceCheckoutId, setForceCheckoutId] = useState(null);
 
+  useEffect(() => {
+    const token = localStorage.getItem('ms_admin_token');
+    if (!token) {
+      router.replace('/admin/login');
+    }
+  }, [router]);
+
   const live = useApi('/api/admin/live');
   const today = useApi('/api/admin/today');
   const stats = useApi('/api/admin/stats');
+
+  useEffect(() => {
+    const unauthorized = live.data?.error === 'Unauthorized' || today.data?.error === 'Unauthorized' || stats.data?.error === 'Unauthorized';
+    if (unauthorized) {
+      logout();
+    }
+  }, [live.data, today.data, stats.data]);
 
   function logout() {
     localStorage.removeItem('ms_admin_token');
