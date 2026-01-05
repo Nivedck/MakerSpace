@@ -39,9 +39,9 @@ export default function Capture() {
       setErr(null);
       setLoading(true);
 
-      const form = JSON.parse(sessionStorage.getItem('ms_form') || '{}');
-      if (!form.name || !form.user_type) {
-        setErr('Form data missing. Go back and retry.');
+      const user = JSON.parse(sessionStorage.getItem('iedc_user') || '{}');
+      if (!user.member_id || !user.name) {
+        setErr('User details missing. Go back and retry.');
         setLoading(false);
         return;
       }
@@ -68,13 +68,13 @@ export default function Capture() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'checkin',
-          user_type: form.user_type,
-          name: form.name,
-          reg_no: form.reg_no || '',
-          phone: form.phone || '',
-          department: form.department || '',
-          year: form.year || '',
-          purpose: form.purpose,
+          user_type: 'student',
+          name: user.name,
+          reg_no: user.member_id,
+          phone: '',
+          department: user.branch || '',
+          year: user.year_of_admission || '',
+          purpose: 'IEDC',
           photo_base64: imageDataUrl,
         }),
       });
@@ -88,7 +88,7 @@ export default function Capture() {
       }
 
       // Success
-      sessionStorage.removeItem('ms_form');
+      sessionStorage.removeItem('iedc_user');
       router.push(`/success?id=${json.id}`);
     } catch (e) {
       setErr(e.message || 'An error occurred');
@@ -132,7 +132,7 @@ export default function Capture() {
         >
           {loading ? 'Uploading...' : 'Capture & Submit'}
         </button>
-        <Link href="/form" className="btn btn-outline">
+        <Link href="/" className="btn btn-outline">
           Back
         </Link>
       </div>
