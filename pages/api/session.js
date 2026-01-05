@@ -16,7 +16,8 @@ function normalizeRegNo(raw) {
 
 function validateRegNo(regNo) {
   const regex = /^KSD(2[0-9])(IT|CS|CE|ME|EC|EE|CB|AI)\d{3}$/;
-  return regex.test(regNo);
+  const iedcRegex = /^IEDC[0-9A-Z]+$/;
+  return regex.test(regNo) || iedcRegex.test(regNo);
 }
 
 function validatePhone(phone) {
@@ -53,7 +54,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid user_type' });
       }
       if (!name) return res.status(400).json({ error: 'Missing name' });
-      if (!purpose || !PURPOSES.includes(purpose)) return res.status(400).json({ error: 'Invalid purpose' });
+      if (!purpose) return res.status(400).json({ error: 'Invalid purpose' });
+      // Allow IEDC flow with purpose 'IEDC'
+      if (purpose !== 'IEDC' && !PURPOSES.includes(purpose)) {
+        return res.status(400).json({ error: 'Invalid purpose' });
+      }
       if (!photo_base64) return res.status(400).json({ error: 'Photo is required for check-in' });
 
       let identifier, identifierField;

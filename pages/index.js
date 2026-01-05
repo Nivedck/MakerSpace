@@ -14,14 +14,14 @@ export default function Home() {
     setUser(null);
     setLoading(true);
     try {
-      const resp = await fetch(`https://iedclbscekapi.vercel.app/api/users/member?id=${encodeURIComponent(id.trim())}`);
+      const cleanId = id.trim().toUpperCase();
+      const resp = await fetch(`https://iedclbscekapi.vercel.app/api/users/member?id=${encodeURIComponent(cleanId)}`);
       const data = await resp.json();
-      if (!resp.ok || !data || !data.member_id) {
-        // Not registered
+      if (!resp.ok || !data || data.success !== true || !data.data) {
         window.location.href = 'https://www.iedclbscek.in/register';
         return;
       }
-      setUser(data);
+      setUser(data.data);
     } catch (e) {
       setErr('Could not verify membership. Try again.');
     }
@@ -62,11 +62,11 @@ export default function Home() {
         {user && (
           <div className="card stack">
             <div className="subtitle">Membership Verified</div>
-            <div><b>Name:</b> {user.name}</div>
-            <div><b>Membership ID:</b> {user.member_id}</div>
-            <div><b>Admission No:</b> {user.admission_no}</div>
-            <div><b>Year of Admission:</b> {user.year_of_admission}</div>
-            <div><b>Branch:</b> {user.branch}</div>
+            <div><b>Name:</b> {user.firstName} {user.lastName}</div>
+            <div><b>Membership ID:</b> {user.membershipId}</div>
+            <div><b>Admission No:</b> {user.admissionNo}</div>
+            <div><b>Year of Admission:</b> {user.yearOfJoining}</div>
+            <div><b>Department:</b> {user.department}</div>
             <button className="btn btn-primary" onClick={proceed}>Proceed to Photo Capture</button>
           </div>
         )}

@@ -40,7 +40,7 @@ export default function Capture() {
       setLoading(true);
 
       const user = JSON.parse(sessionStorage.getItem('iedc_user') || '{}');
-      if (!user.member_id || !user.name) {
+      if (!user.membershipId || !user.firstName) {
         setErr('User details missing. Go back and retry.');
         setLoading(false);
         return;
@@ -69,11 +69,11 @@ export default function Capture() {
         body: JSON.stringify({
           action: 'checkin',
           user_type: 'student',
-          name: user.name,
-          reg_no: user.member_id,
+          name: `${user.firstName} ${user.lastName || ''}`.trim(),
+          reg_no: user.membershipId,
           phone: '',
-          department: user.branch || '',
-          year: user.year_of_admission || '',
+          department: user.department || '',
+          year: user.yearOfJoining || '',
           purpose: 'IEDC',
           photo_base64: imageDataUrl,
         }),
