@@ -6,7 +6,7 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "postinstall": "npm_config_platform=linux npm_config_arch=x64 npm_config_libc=glibc npm rebuild sharp"
+    "postinstall": "npm_config_platform=linux npm_config_arch=x64 npm_config_libc=glibc npm rebuild sharp --force"
   },
   "dependencies": {
     "cloudinary": "^2.8.0",
