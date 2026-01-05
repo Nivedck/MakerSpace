@@ -12,9 +12,9 @@
     "firebase-admin": "^11.10.0",
     "jsonwebtoken": "9.0.0",
     "next": "13.4.7",
+    "protobufjs": "^7.2.5",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "sharp": "^0.34.5",
-    "protobufjs": "^7.2.5"
+    "sharp": "^0.34.5"
   }
 }
