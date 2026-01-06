@@ -104,16 +104,7 @@ export default function CheckoutConfirm() {
           <strong>{formatElapsed(session.elapsed_minutes)}</strong>
         </div>
 
-        {session.check_in_photo_url && (
-          <div>
-            <span className="label">Check-In Photo</span>
-            <img 
-              src={session.check_in_photo_url} 
-              alt="Check-in" 
-              style={{width:'100%', borderRadius:'10px', marginTop:'8px'}}
-            />
-          </div>
-        )}
+        {/* Check-in photo removed from checkout view per requirement */}
       </div>
 
       {err && <div className="error card">{err}</div>}
