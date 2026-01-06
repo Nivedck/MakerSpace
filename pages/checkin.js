@@ -73,7 +73,19 @@ export default function CheckIn() {
           )}
 
           {!user && (
-            <Link href="/" className="btn btn-outline">Back</Link>
+            <>
+              <Link href="/" className="btn btn-outline">Back</Link>
+              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                <a 
+                  href="https://www.iedclbscek.in/register" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--primary)', fontSize: '0.9rem', textDecoration: 'none', fontWeight: '500' }}
+                >
+                  Not registered? Sign up here →
+                </a>
+              </div>
+            </>
           )}
         </form>
 
