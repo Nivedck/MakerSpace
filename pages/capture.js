@@ -14,7 +14,11 @@ export default function Capture() {
     const start = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
+          video: { 
+            facingMode: 'user', 
+            width: { ideal: 640 }, 
+            height: { ideal: 480 } 
+          },
           audio: false,
         });
         if (videoRef.current) {
@@ -33,6 +37,20 @@ export default function Capture() {
       }
     };
   }, []);
+
+  function compressImage(canvas, quality = 0.65, maxWidth = 800) {
+    // Resize if needed
+    if (canvas.width > maxWidth) {
+      const scale = maxWidth / canvas.width;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = maxWidth;
+      tempCanvas.height = canvas.height * scale;
+      const ctx = tempCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+      return tempCanvas.toDataURL('image/jpeg', quality);
+    }
+    return canvas.toDataURL('image/jpeg', quality);
+  }
 
   async function take() {
     try {
@@ -60,7 +78,9 @@ export default function Capture() {
       c.height = v.videoHeight;
       const ctx = c.getContext('2d');
       ctx.drawImage(v, 0, 0, c.width, c.height);
-      const imageDataUrl = c.toDataURL('image/jpeg', 0.8);
+      
+      // Compress and optimize image
+      const imageDataUrl = compressImage(c, 0.65, 800);
 
       // Submit to API
       const resp = await fetch('/api/session', {
