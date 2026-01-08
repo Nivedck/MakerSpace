@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import * as faceapi from 'face-api.js';
 
 export default function Capture() {
   const videoRef = useRef();
@@ -9,10 +10,15 @@ export default function Capture() {
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
 
   useEffect(() => {
     const start = async () => {
       try {
+        // Load face detection model
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        setModelsLoaded(true);
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'user', 
@@ -73,6 +79,24 @@ export default function Capture() {
         return;
       }
 
+      // Face detection
+      if (!modelsLoaded) {
+        setErr('Face detection model loading. Please wait...');
+        setLoading(false);
+        return;
+      }
+
+      const detections = await faceapi.detectAllFaces(
+        v,
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+      );
+
+      if (detections.length === 0) {
+        setErr('⚠️ No face detected. Please position your face clearly in the frame and try again.');
+        setLoading(false);
+        return;
+      }
+
       // Capture canvas
       c.width = v.videoWidth;
       c.height = v.videoHeight;
@@ -127,10 +151,10 @@ export default function Capture() {
       {err && <div className="error card">{err}</div>}
 
       <div className="card camera-container">
-        {!cameraReady && (
+        {(!cameraReady || !modelsLoaded) && (
           <div className="loading-overlay">
             <div className="spinner"></div>
-            <p>Starting camera...</p>
+            <p>{!modelsLoaded ? 'Loading face detection...' : 'Starting camera...'}</p>
           </div>
         )}
         <video 
@@ -148,7 +172,7 @@ export default function Capture() {
         <button 
           onClick={take} 
           className="btn btn-primary"
-          disabled={!cameraReady || loading}
+          disabled={!cameraReady || !modelsLoaded || loading}
         >
           {loading ? 'Uploading...' : 'Capture & Submit'}
         </button>
