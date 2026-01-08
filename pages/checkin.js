@@ -55,7 +55,7 @@ export default function CheckIn() {
         <form className="card stack" onSubmit={handleSubmit}>
           <input
             className="input"
-            placeholder="IEDC Membership ID (e.g., IEDC24IT029)"
+            placeholder="IEDC Membership ID (e.g., IEDC28CS029)"
             value={id}
             onChange={e => setId(e.target.value)}
             required
