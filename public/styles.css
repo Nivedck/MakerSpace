@@ -51,7 +51,7 @@ body{
 /* Top navigation */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:transparent}
 .brand{display:flex;align-items:center;gap:12px}
-.logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--primary),#7c3aed);display:flex;align-items:center;justify-content:center;color:var(--primary-ink);font-weight:700;box-shadow:var(--shadow-sm)}
+.brand-logo{height:44px;width:auto;display:block}
 .brand h1{margin:0;font-size:1.05rem;letter-spacing:0.2px}
 .nav-actions{display:flex;gap:10px;align-items:center}
 
