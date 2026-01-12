@@ -48,9 +48,9 @@ export default async function handler(req, res) {
 
     // CHECK-IN
     if (action === 'checkin') {
-      const { user_type, role, name, reg_no, phone, department, year, purpose, photo_base64 } = req.body;
+      const { user_type, role, name, reg_no, phone, email, department, year, purpose, photo_base64 } = req.body;
 
-      if (!user_type || !['student', 'staff'].includes(user_type)) {
+      if (!user_type || !['student', 'staff', 'guest'].includes(user_type)) {
         return res.status(400).json({ error: 'Invalid user_type' });
       }
       if (!name) return res.status(400).json({ error: 'Missing name' });
@@ -71,12 +71,13 @@ export default async function handler(req, res) {
         identifier = regNo;
         identifierField = 'reg_no';
       } else {
-        const cleanPhone = (phone || '').replace(/\s+/g, '');
-        if (!validatePhone(cleanPhone)) {
-          return res.status(400).json({ error: 'Invalid phone number (10 digits required)' });
+        const memberId = normalizeRegNo(reg_no);
+        const iedcRegex = /^IEDC[0-9A-Z]+$/;
+        if (!iedcRegex.test(memberId)) {
+          return res.status(400).json({ error: 'Invalid membership ID format' });
         }
-        identifier = cleanPhone;
-        identifierField = 'phone';
+        identifier = memberId;
+        identifierField = 'reg_no';
       }
 
       // Check for existing open session
@@ -97,6 +98,7 @@ export default async function handler(req, res) {
         role: role || user_type,
         name,
         purpose,
+        email: email || null,
         check_in_time: admin.firestore.FieldValue.serverTimestamp(),
         check_in_photo_url: photoUrl,
         check_out_time: null,
@@ -111,10 +113,10 @@ export default async function handler(req, res) {
         sessionData.year = year || null;
         sessionData.phone = null;
       } else {
-        sessionData.phone = identifier;
-        sessionData.reg_no = null;
-        sessionData.department = null;
-        sessionData.year = null;
+        sessionData.reg_no = identifier;
+        sessionData.department = department || null;
+        sessionData.year = year || null;
+        sessionData.phone = null;
       }
 
       const docRef = await db.collection('sessions').add(sessionData);

@@ -71,7 +71,7 @@ export default function Capture() {
       }
 
       const role = (user.role || 'student').toLowerCase();
-      const userType = role === 'student' ? 'student' : 'student';
+      const userType = role === 'student' ? 'student' : role === 'staff' ? 'staff' : 'guest';
 
       const v = videoRef.current;
       const c = canvasRef.current;
@@ -123,6 +123,7 @@ export default function Capture() {
           department: user.department || '',
           year: user.yearOfJoining || '',
           purpose: user.purpose || 'IEDC',
+          email: user.email || '',
           photo_base64: imageDataUrl,
         }),
       });
