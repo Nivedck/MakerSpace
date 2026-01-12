@@ -89,6 +89,15 @@ export default function CheckIn() {
     setLoading(false);
   }
 
+  function startRegister() {
+    setErr('');
+    setUser(null);
+    setPurpose('');
+    setOtp('');
+    setOtpSent(false);
+    setStage('register');
+  }
+
   async function sendOtp() {
     setErr('');
     if (!form.email.trim()) {
@@ -287,6 +296,17 @@ export default function CheckIn() {
                     >
                       Not registered? Sign up here →
                     </a>
+                  </div>
+                )}
+                {!isStudent && (
+                  <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                    <button 
+                      type="button" 
+                      onClick={startRegister}
+                      style={{ background:'transparent', border:'none', color:'var(--primary)', fontSize: '0.9rem', fontWeight: 600, cursor:'pointer', padding:0 }}
+                    >
+                      Not registered? Register here →
+                    </button>
                   </div>
                 )}
               </>
