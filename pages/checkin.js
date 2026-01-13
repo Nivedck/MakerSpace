@@ -9,10 +9,12 @@ export default function CheckIn() {
   const [user, setUser] = useState(null);
   const [purpose, setPurpose] = useState('');
   const [stage, setStage] = useState('lookup'); // lookup | register | verified
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', department: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', department: '', organization: '' });
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpToken, setOtpToken] = useState('');
   const [registering, setRegistering] = useState(false);
   const router = useRouter();
 
@@ -95,11 +97,15 @@ export default function CheckIn() {
     setPurpose('');
     setOtp('');
     setOtpSent(false);
+    setOtpVerified(false);
+    setOtpToken('');
     setStage('register');
   }
 
   async function sendOtp() {
     setErr('');
+    setOtpVerified(false);
+    setOtpToken('');
     if (!form.email.trim()) {
       setErr('Email is required to send OTP');
       return;
@@ -124,12 +130,8 @@ export default function CheckIn() {
     setOtpSending(false);
   }
 
-  async function registerStaffGuest() {
+  async function verifyOtp() {
     setErr('');
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setErr('First and last name are required');
-      return;
-    }
     if (!form.email.trim()) {
       setErr('Email is required');
       return;
@@ -140,16 +142,63 @@ export default function CheckIn() {
     }
     setRegistering(true);
     try {
+      const resp = await fetch('/api/iedc/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email.trim(), otp: otp.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.success) {
+        setErr(data?.error || 'Invalid or expired OTP');
+        setRegistering(false);
+        return;
+      }
+      setOtpVerified(true);
+      setOtpToken(data?.otpToken || '');
+      setErr('');
+    } catch (e) {
+      setErr('Failed to verify OTP. Try again.');
+    }
+    setRegistering(false);
+  }
+
+  async function registerStaffGuest() {
+    setErr('');
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setErr('First and last name are required');
+      return;
+    }
+    if (!form.email.trim()) {
+      setErr('Email is required');
+      return;
+    }
+    if (role === 'guest' && !form.organization.trim()) {
+      setErr('Organization is required for guests');
+      return;
+    }
+    if (!otp.trim()) {
+      setErr('Enter the OTP sent to your email');
+      return;
+    }
+    if (!otpVerified) {
+      setErr('Please verify the OTP first.');
+      return;
+    }
+    const tokenToSend = otpToken || otp.trim();
+    setRegistering(true);
+    try {
       const resp = await fetch('/api/iedc/register-staff-guest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: form.email.trim(),
-          otp: otp.trim(),
+          otpToken: tokenToSend,
+          otp: tokenToSend,
           userType: role,
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
-          department: form.department.trim() || undefined,
+          department: role === 'staff' ? (form.department.trim() || undefined) : undefined,
+          organization: role === 'guest' ? form.organization.trim() : undefined,
         }),
       });
       const data = await resp.json();
@@ -168,14 +217,15 @@ export default function CheckIn() {
         membershipId,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        department: form.department.trim(),
+        department: role === 'staff' ? form.department.trim() : '',
+        organization: role === 'guest' ? form.organization.trim() : '',
         email: form.email.trim(),
         userType: role,
       };
       setUser(newUser);
-      setStage('verified');
-      setPurpose('');
       setErr('');
+      // Redirect back to role-specific login/check-in page
+      router.push(`/checkin?role=${role}`);
     } catch (e) {
       setErr('Registration failed. Try again.');
     }
@@ -331,10 +381,18 @@ export default function CheckIn() {
               <label className="label">Email (for OTP)</label>
               <input className="input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
             </div>
-            <div className="field">
-              <label className="label">Department (optional)</label>
-              <input className="input" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
-            </div>
+            {role === 'staff' && (
+              <div className="field">
+                <label className="label">Department (optional)</label>
+                <input className="input" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
+              </div>
+            )}
+            {role === 'guest' && (
+              <div className="field">
+                <label className="label">Organization (required for guests)</label>
+                <input className="input" value={form.organization} onChange={e => setForm({ ...form, organization: e.target.value })} />
+              </div>
+            )}
 
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <button type="button" className="btn btn-outline" onClick={sendOtp} disabled={otpSending}>
@@ -343,17 +401,42 @@ export default function CheckIn() {
               {otpSent && <span className="muted">OTP sent to {form.email}</span>}
             </div>
 
-            <div className="field">
-              <label className="label">Enter OTP</label>
-              <input className="input" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} />
+            <div className="row" style={{ gap: '10px' }}>
+              <input
+                className="input"
+                placeholder="Enter OTP"
+                value={otp}
+                onChange={e => { setOtp(e.target.value); setOtpVerified(false); }}
+                maxLength={6}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={verifyOtp}
+                disabled={registering || !otp.trim() || !form.email.trim()}
+              >
+                {registering ? 'Verifying...' : 'Verify OTP'}
+              </button>
             </div>
+            {otpSent && !registering && (
+              <small style={{ color: otpVerified ? 'var(--primary)' : 'var(--muted)', fontWeight: 600 }}>
+                {otpVerified ? 'OTP verified ✓' : 'OTP sent. Enter and verify.'}
+              </small>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={registerStaffGuest}
+              disabled={registering || !otpVerified}
+            >
+              {registering ? 'Submitting...' : 'Register & Continue'}
+            </button>
 
             {err && <div className="error">{err}</div>}
 
             <div className="footer-actions">
-              <button className="btn btn-primary" onClick={registerStaffGuest} disabled={registering}>
-                {registering ? 'Submitting...' : 'Register & Continue'}
-              </button>
               <Link href="/checkin-role" className="btn btn-outline">Cancel</Link>
             </div>
           </div>
@@ -370,7 +453,12 @@ export default function CheckIn() {
                 <div><b>Year of Admission:</b> {user.yearOfJoining}</div>
               </>
             )}
-            <div><b>Department:</b> {user.department || form.department || '—'}</div>
+            {role === 'staff' && (
+              <div><b>Department:</b> {user.department || form.department || '—'}</div>
+            )}
+            {role === 'guest' && (
+              <div><b>Organization:</b> {user.organization || form.organization || '—'}</div>
+            )}
             {!isStudent && (
               <div><b>Email:</b> {user.email || form.email || '—'}</div>
             )}
@@ -389,10 +477,18 @@ export default function CheckIn() {
                   <label className="label">Email</label>
                   <input className="input" type="email" value={user.email || form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                 </div>
-                <div className="field">
-                  <label className="label">Department (optional)</label>
-                  <input className="input" value={user.department || form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
-                </div>
+                {role === 'staff' && (
+                  <div className="field">
+                    <label className="label">Department (optional)</label>
+                    <input className="input" value={user.department || form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
+                  </div>
+                )}
+                {role === 'guest' && (
+                  <div className="field">
+                    <label className="label">Organization (required for guests)</label>
+                    <input className="input" value={user.organization || form.organization} onChange={e => setForm({ ...form, organization: e.target.value })} />
+                  </div>
+                )}
               </div>
             )}
 
