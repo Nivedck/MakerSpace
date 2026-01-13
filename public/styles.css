@@ -55,12 +55,14 @@ body{
   line-height:1.45;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+  overscroll-behavior-y: contain;
   transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Layout shell */
 .app-shell{min-height:100vh;display:flex;flex-direction:column}
-.container{width:100%;max-width:1100px;margin:0 auto;padding:28px 20px 92px;flex:1}
+.container{width:100%;max-width:1100px;margin:0 auto;padding:28px 20px 48px;flex:1}
 
 /* Top navigation */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:transparent}
@@ -128,7 +130,7 @@ small{font-size:.85rem;color:var(--muted)}
 button:disabled{opacity:.55;cursor:not-allowed}
 
 /* Responsive tweaks */
-@media (max-width:760px){.container{padding:20px 14px 110px}.grid2{grid-template-columns:1fr}.topbar{padding:12px}}
+@media (max-width:760px){.container{padding:20px 14px 56px}.grid2{grid-template-columns:1fr}.topbar{padding:12px}}
 
 /* Polished images */
 .card img{border-radius:10px;box-shadow:var(--shadow-sm);width:100%;height:auto}
