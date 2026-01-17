@@ -138,9 +138,10 @@ export default function CheckIn() {
     setOtpToken('');
     const payload = {};
     // identifier can be email or membershipId; fallback to form.email or user.membershipId
-    if (identifier) {
-      if (typeof identifier === 'string' && identifier.toUpperCase().startsWith('IEDC')) payload.membershipId = identifier.trim();
-      else payload.email = identifier.trim();
+    if (typeof identifier === 'string' && identifier.trim()) {
+      const idClean = identifier.trim();
+      if (idClean.toUpperCase().startsWith('IEDC')) payload.membershipId = idClean;
+      else payload.email = idClean;
     } else if (form.email && form.email.trim()) {
       payload.email = form.email.trim();
     } else if (user?.membershipId) {
