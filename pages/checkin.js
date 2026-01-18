@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
@@ -15,6 +15,10 @@ export default function CheckIn() {
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpToken, setOtpToken] = useState('');
+  const [otpCooldownUntil, setOtpCooldownUntil] = useState(0);
+  const [otpResendCount, setOtpResendCount] = useState(0);
+  const [otpTarget, setOtpTarget] = useState('');
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [registering, setRegistering] = useState(false);
   const router = useRouter();
 
@@ -62,6 +66,11 @@ export default function CheckIn() {
     setStage('lookup');
     setOtp('');
     setOtpSent(false);
+    setOtpVerified(false);
+    setOtpToken('');
+    setOtpCooldownUntil(0);
+    setOtpResendCount(0);
+    setOtpTarget('');
     setLoading(true);
 
     try {
@@ -129,27 +138,77 @@ export default function CheckIn() {
     setOtpSent(false);
     setOtpVerified(false);
     setOtpToken('');
+    setOtpCooldownUntil(0);
+    setOtpResendCount(0);
+    setOtpTarget('');
     setStage('register');
   }
+
+  function resetOtpState() {
+    setOtp('');
+    setOtpSent(false);
+    setOtpVerified(false);
+    setOtpToken('');
+    setOtpCooldownUntil(0);
+    setOtpResendCount(0);
+    setOtpTarget('');
+  }
+
+  useEffect(() => {
+    if (!otpCooldownUntil) {
+      setCooldownSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((otpCooldownUntil - Date.now()) / 1000));
+      setCooldownSeconds(remaining);
+      if (remaining <= 0) clearInterval(timer);
+    }, 500);
+    return () => clearInterval(timer);
+  }, [otpCooldownUntil]);
 
   async function sendOtp(identifier) {
     setErr('');
     setOtpVerified(false);
     setOtpToken('');
     const payload = {};
+    let target = '';
     // identifier can be email or membershipId; fallback to form.email or user.membershipId
     if (typeof identifier === 'string' && identifier.trim()) {
       const idClean = identifier.trim();
-      if (idClean.toUpperCase().startsWith('IEDC')) payload.membershipId = idClean;
-      else payload.email = idClean;
+      if (idClean.toUpperCase().startsWith('IEDC')) {
+        payload.membershipId = idClean;
+        target = idClean;
+      } else {
+        payload.email = idClean;
+        target = idClean.toLowerCase();
+      }
     } else if (form.email && form.email.trim()) {
       payload.email = form.email.trim();
+      target = form.email.trim().toLowerCase();
     } else if (user?.membershipId) {
       payload.membershipId = user.membershipId;
+      target = user.membershipId;
     } else {
       setErr('Email or membership ID is required to send OTP');
-      return;
+      return false;
     }
+
+    if (payload.email && !/^\S+@\S+\.\S+$/.test(payload.email)) {
+      setErr('Enter a valid email address');
+      return false;
+    }
+
+    if (otpCooldownUntil && Date.now() < otpCooldownUntil) {
+      setErr(`Please wait ${cooldownSeconds || 1}s before resending OTP`);
+      return false;
+    }
+
+    if (otpResendCount >= 5) {
+      setErr('OTP resend limit reached. Please try again later.');
+      return false;
+    }
+
     setOtpSending(true);
     try {
       const resp = await fetch('/api/iedc/send-otp', {
@@ -161,30 +220,49 @@ export default function CheckIn() {
       if (!resp.ok || !data?.success) {
         setErr(data?.error || 'Failed to send OTP');
         setOtpSending(false);
-        return;
+        return false;
       }
       setOtpSent(true);
+      setOtpTarget(target);
+      setOtpResendCount(c => c + 1);
+      setOtpCooldownUntil(Date.now() + 30000);
+      setOtpSending(false);
+      return true;
     } catch (e) {
       setErr('Failed to send OTP');
     }
     setOtpSending(false);
+    return false;
   }
 
   async function verifyOtp() {
     setErr('');
-    if (!otp.trim()) {
+    const otpClean = otp.trim();
+    if (!otpClean) {
       setErr('Enter the OTP');
+      return;
+    }
+    if (!/^\d{6}$/.test(otpClean)) {
+      setErr('Enter the 6-digit OTP');
       return;
     }
     setRegistering(true);
     try {
-      const payload = { otp: otp.trim() };
+      const payload = { otp: otpClean };
       // For membership lookup flow, we always verify by membershipId.
       if (stage === 'otp' && user?.membershipId) payload.membershipId = user.membershipId;
       else if (form.email && form.email.trim()) payload.email = form.email.trim();
       else if (user?.membershipId) payload.membershipId = user.membershipId;
       else {
         setErr('Email or membership ID is required to verify OTP');
+        setRegistering(false);
+        return;
+      }
+
+      const currentTarget = payload.email ? payload.email.toLowerCase() : payload.membershipId;
+      if (otpTarget && currentTarget && otpTarget !== currentTarget) {
+        setErr('OTP target changed. Please resend OTP.');
+        resetOtpState();
         setRegistering(false);
         return;
       }
@@ -238,14 +316,11 @@ export default function CheckIn() {
     }
 
     // Reset OTP state for a clean start
-    setOtp('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setOtpToken('');
+    resetOtpState();
 
-    await sendOtp(user.membershipId);
-    // Move to OTP entry stage after user action
-    setStage('otp');
+    const ok = await sendOtp(user.membershipId);
+    // Move to OTP entry stage only if OTP was sent
+    if (ok) setStage('otp');
   }
 
   async function registerStaffGuest() {
@@ -258,6 +333,10 @@ export default function CheckIn() {
       setErr('Email is required');
       return;
     }
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+      setErr('Enter a valid email address');
+      return;
+    }
     // (Removed staff email domain restriction)
     if (role === 'guest' && !form.organization.trim()) {
       setErr('Organization is required for guests');
@@ -265,6 +344,10 @@ export default function CheckIn() {
     }
     if (!otp.trim()) {
       setErr('Enter the OTP sent to your email');
+      return;
+    }
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setErr('Enter the 6-digit OTP');
       return;
     }
     if (!otpVerified) {
@@ -311,6 +394,11 @@ export default function CheckIn() {
       };
       setUser(newUser);
       setErr('');
+      setRegistering(false);
+      resetOtpState();
+      setForm({ firstName: '', lastName: '', email: '', department: '', organization: '' });
+      setPurpose('');
+      setStage('lookup');
       // Redirect back to role-specific login/check-in page only on success
       router.push(`/checkin?role=${role}`);
       return;
@@ -359,10 +447,14 @@ export default function CheckIn() {
     setPurpose('');
     setStage('lookup');
     setErr('');
-    setOtp('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setOtpToken('');
+    resetOtpState();
+  }
+
+  function handleRegisterEmailChange(value) {
+    setForm({ ...form, email: value });
+    if (stage === 'register' && (otpSent || otpVerified || otpSending || otpToken)) {
+      resetOtpState();
+    }
   }
 
   const showDetails = stage === 'details' && user;
@@ -453,7 +545,7 @@ export default function CheckIn() {
             </div>
             <div className="field">
               <label className="label">Email (for OTP)</label>
-              <input className="input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              <input className="input" type="email" value={form.email} onChange={e => handleRegisterEmailChange(e.target.value)} />
             </div>
             {role === 'staff' && (
               <div className="field">
@@ -469,11 +561,18 @@ export default function CheckIn() {
             )}
 
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <button type="button" className="btn btn-outline" onClick={sendOtp} disabled={otpSending}>
+              <button type="button" className="btn btn-outline" onClick={sendOtp} disabled={otpSending || cooldownSeconds > 0}>
                 {otpSending ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
               </button>
-              {otpSent && <span className="muted">OTP sent to {form.email}</span>}
+              {cooldownSeconds > 0 ? (
+                <span className="muted">Retry in {cooldownSeconds}s</span>
+              ) : (
+                otpSent && <span className="muted">OTP sent to {form.email}</span>
+              )}
             </div>
+            {otpResendCount > 0 && (
+              <small className="muted">OTP sent {otpResendCount} time{otpResendCount > 1 ? 's' : ''}</small>
+            )}
 
             <div className="row" style={{ gap: '10px' }}>
               <input
@@ -488,7 +587,7 @@ export default function CheckIn() {
                 type="button"
                 className="btn btn-primary"
                 onClick={verifyOtp}
-                disabled={registering || !otp.trim() || !(form.email.trim() || user?.membershipId)}
+                disabled={registering || otpSending || !/^\d{6}$/.test(otp.trim()) || !(form.email.trim() || user?.membershipId)}
               >
                 {registering ? 'Verifying...' : 'Verify OTP'}
               </button>
@@ -525,11 +624,18 @@ export default function CheckIn() {
             <div className="muted">OTP was sent to your registered email. Enter and verify it.</div>
 
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <button type="button" className="btn btn-outline" onClick={() => sendOtp(user?.membershipId)} disabled={otpSending}>
+              <button type="button" className="btn btn-outline" onClick={() => sendOtp(user?.membershipId)} disabled={otpSending || cooldownSeconds > 0}>
                 {otpSending ? 'Sending...' : otpSent ? 'Resend OTP' : 'Resend OTP'}
               </button>
-              {otpSent && <span className="muted">OTP sent</span>}
+              {cooldownSeconds > 0 ? (
+                <span className="muted">Retry in {cooldownSeconds}s</span>
+              ) : (
+                otpSent && <span className="muted">OTP sent</span>
+              )}
             </div>
+            {otpResendCount > 0 && (
+              <small className="muted">OTP sent {otpResendCount} time{otpResendCount > 1 ? 's' : ''}</small>
+            )}
 
             <div className="row" style={{ gap: '10px' }}>
               <input
@@ -539,7 +645,7 @@ export default function CheckIn() {
                 onChange={e => { setOtp(e.target.value); setOtpVerified(false); }}
                 maxLength={6}
               />
-              <button type="button" className="btn btn-primary" onClick={verifyOtp} disabled={registering || !otp.trim()}>
+              <button type="button" className="btn btn-primary" onClick={verifyOtp} disabled={registering || otpSending || !/^\d{6}$/.test(otp.trim())}>
                 {registering ? 'Verifying...' : 'Verify OTP'}
               </button>
             </div>
