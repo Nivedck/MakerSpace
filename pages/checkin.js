@@ -21,6 +21,57 @@ export default function CheckIn() {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [registering, setRegistering] = useState(false);
   const router = useRouter();
+  const shouldConfirmLeave = stage === 'register';
+
+  useEffect(() => {
+    const confirmLeave = () => window.confirm('Registration is in progress. Are you sure you want to leave this page?');
+
+    const handleDocumentClick = (event) => {
+      if (!shouldConfirmLeave) return;
+      const anchor = event.target?.closest?.('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      const target = anchor.getAttribute('target');
+      if (!href || href.startsWith('#') || target === '_blank' || anchor.hasAttribute('download')) return;
+      if (!confirmLeave()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    const handleBeforeUnload = (event) => {
+      if (!shouldConfirmLeave) return;
+      event.preventDefault();
+      event.returnValue = '';
+      return '';
+    };
+
+    const handleRouteChangeStart = (url) => {
+      if (!shouldConfirmLeave) return;
+      if (url === router.asPath) return;
+      if (!confirmLeave()) {
+        router.events.emit('routeChangeError');
+        throw new Error('Route change aborted.');
+      }
+    };
+
+    const handleBeforePopState = () => {
+      if (!shouldConfirmLeave) return true;
+      return confirmLeave();
+    };
+
+    document.addEventListener('click', handleDocumentClick, true);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    router.events.on('routeChangeStart', handleRouteChangeStart);
+    router.beforePopState(handleBeforePopState);
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      router.events.off('routeChangeStart', handleRouteChangeStart);
+      router.beforePopState(() => true);
+    };
+  }, [router, shouldConfirmLeave]);
 
   const LoadingBar = ({ label }) => (
     <div style={{ width: '100%' }}>
