@@ -8,7 +8,7 @@ export default function CheckIn() {
   const [err, setErr] = useState('');
   const [user, setUser] = useState(null);
   const [purpose, setPurpose] = useState('');
-  const [stage, setStage] = useState('lookup'); // lookup | details | otp | register
+  const [stage, setStage] = useState('lookup'); 
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', department: '', organization: '' });
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -150,7 +150,6 @@ export default function CheckIn() {
       setErr('Email or membership ID is required to send OTP');
       return;
     }
-
     setOtpSending(true);
     try {
       const resp = await fetch('/api/iedc/send-otp', {
@@ -259,6 +258,7 @@ export default function CheckIn() {
       setErr('Email is required');
       return;
     }
+    // (Removed staff email domain restriction)
     if (role === 'guest' && !form.organization.trim()) {
       setErr('Organization is required for guests');
       return;
