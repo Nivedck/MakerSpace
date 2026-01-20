@@ -7,7 +7,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const PURPOSES = ['Project Work', 'Workshop', 'Event', 'Mentoring','Visit', 'IEDC','Other'];
+const PURPOSES = ['Visit', 'Project Work', 'Event', 'Maintainance', 'Others', 'IEDC'];
 const BRANCHES = ['IT', 'CS', 'CE', 'ME', 'EC', 'EE', 'CB', 'AI'];
 
 function normalizeRegNo(raw) {
@@ -48,13 +48,17 @@ export default async function handler(req, res) {
 
     // CHECK-IN
     if (action === 'checkin') {
-      const { user_type, role, name, reg_no, phone, email, department, year, organization, purpose, photo_base64 } = req.body;
+      const { user_type, role, name, reg_no, phone, email, department, year, organization, photo_base64 } = req.body;
+      let { purpose } = req.body;
 
       if (!user_type || !['student', 'staff', 'guest'].includes(user_type)) {
         return res.status(400).json({ error: 'Invalid user_type' });
       }
       if (!name) return res.status(400).json({ error: 'Missing name' });
       if (!purpose) return res.status(400).json({ error: 'Invalid purpose' });
+      // Normalize legacy values to avoid DB inconsistencies
+      if (purpose === 'Maintenance') purpose = 'Maintainance';
+      if (purpose === 'Other') purpose = 'Others';
       // Allow IEDC flow with purpose 'IEDC'
       if (purpose !== 'IEDC' && !PURPOSES.includes(purpose)) {
         return res.status(400).json({ error: 'Invalid purpose' });

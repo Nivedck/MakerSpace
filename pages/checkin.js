@@ -762,11 +762,11 @@ export default function CheckIn() {
               <label className="label">Purpose</label>
               <select className="select" value={purpose} onChange={e => setPurpose(e.target.value)} required>
                 <option value="" disabled>Select purpose</option>
+                <option value="Visit">Visit</option>
                 <option value="Project Work">Project Work</option>
-                <option value="Workshop">Workshop</option>
                 <option value="Event">Event</option>
-                <option value="Mentoring">Mentoring</option>
-                <option value="Other">Other</option>
+                <option value="Maintainance">Maintainance</option>
+                <option value="Others">Others</option>
               </select>
             </div>
 
