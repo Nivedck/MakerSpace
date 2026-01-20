@@ -755,32 +755,7 @@ export default function CheckIn() {
             )}
 
             {!isStudent && (
-              <div className="grid2">
-                <div className="field">
-                  <label className="label">First Name</label>
-                  <input className="input" value={user.firstName || form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-                </div>
-                <div className="field">
-                  <label className="label">Last Name</label>
-                  <input className="input" value={user.lastName || form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-                </div>
-                <div className="field">
-                  <label className="label">Email</label>
-                  <input className="input" type="email" value={user.email || form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-                </div>
-                {role === 'staff' && (
-                  <div className="field">
-                    <label className="label">Department </label>
-                    <input className="input" value={user.department || form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
-                  </div>
-                )}
-                {role === 'guest' && (
-                  <div className="field">
-                    <label className="label">Organization</label>
-                    <input className="input" value={user.organization || form.organization} onChange={e => setForm({ ...form, organization: e.target.value })} />
-                  </div>
-                )}
-              </div>
+              null
             )}
 
             <div className="field">
