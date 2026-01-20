@@ -147,6 +147,11 @@ export default function CheckIn() {
           window.location.href = 'https://www.iedclbscek.in/register';
           return;
         }
+        if (data.data.userType && data.data.userType !== 'student') {
+          setErr(`This ID is registered as ${data.data.userType}. Please use the correct role.`);
+          setLoading(false);
+          return;
+        }
         const member = { ...data.data, membershipId: data.data.membershipId || cleanId, userType: 'student' };
         setUser(member);
         // Show details first; send OTP only when user clicks Continue
@@ -162,12 +167,22 @@ export default function CheckIn() {
         }
 
         if (verifyData.isRegistered) {
+          if (verifyData.userType && verifyData.userType !== role) {
+            setErr(`This ID is registered as ${verifyData.userType}. Please use the correct role.`);
+            setLoading(false);
+            return;
+          }
           // Try to fetch details if available
           let member = { membershipId: cleanId, userType: role };
           try {
             const detailResp = await fetch(`/api/iedc-member?id=${encodeURIComponent(cleanId)}`);
             const detailData = await detailResp.json();
             if (detailResp.ok && detailData?.success && detailData.data) {
+              if (detailData.data.userType && detailData.data.userType !== role) {
+                setErr(`This ID is registered as ${detailData.data.userType}. Please use the correct role.`);
+                setLoading(false);
+                return;
+              }
               member = { ...detailData.data, membershipId: detailData.data.membershipId || cleanId, userType: role };
             }
           } catch (_) {}
