@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
@@ -22,6 +22,7 @@ export default function CheckIn() {
   const [registering, setRegistering] = useState(false);
   const router = useRouter();
   const shouldConfirmLeave = stage === 'register';
+  const leaveConfirmedRef = useRef(false);
 
   useEffect(() => {
     const confirmLeave = () => window.confirm('Registration is in progress. Are you sure you want to leave this page?');
@@ -36,7 +37,10 @@ export default function CheckIn() {
       if (!confirmLeave()) {
         event.preventDefault();
         event.stopPropagation();
+        leaveConfirmedRef.current = false;
+        return;
       }
+      leaveConfirmedRef.current = true;
     };
 
     const handleBeforeUnload = (event) => {
@@ -49,6 +53,10 @@ export default function CheckIn() {
     const handleRouteChangeStart = (url) => {
       if (!shouldConfirmLeave) return;
       if (url === router.asPath) return;
+      if (leaveConfirmedRef.current) {
+        leaveConfirmedRef.current = false;
+        return;
+      }
       if (!confirmLeave()) {
         router.events.emit('routeChangeError');
         throw new Error('Route change aborted.');
