@@ -10,6 +10,24 @@ cloudinary.config({
 const PURPOSES = ['Visit', 'Project Work', 'Event', 'Maintainance', 'Others', 'IEDC'];
 const BRANCHES = ['IT', 'CS', 'CE', 'ME', 'EC', 'EE', 'CB', 'AI'];
 
+const IEDC_BASE = process.env.IEDC_API_BASE || 'https://api.iedclbscek.in/api';
+
+async function postToIedc(path, body) {
+  try {
+    const resp = await fetch(`${IEDC_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      console.warn('IEDC sync failed:', path, resp.status, text);
+    }
+  } catch (err) {
+    console.warn('IEDC sync error:', path, err.message || err);
+  }
+}
+
 function normalizeRegNo(raw) {
   return raw ? raw.toString().trim().toUpperCase().replace(/\s+/g, '') : '';
 }
@@ -126,6 +144,13 @@ export default async function handler(req, res) {
       }
 
       const docRef = await db.collection('sessions').add(sessionData);
+
+      // Best-effort sync to IEDC makerspace API (do not block local success)
+      await postToIedc('/makerspace/checkin', {
+        membershipId: identifier,
+        action: 'IN'
+      });
+
       return res.json({ ok: true, action: 'checked-in', id: docRef.id });
     }
 
@@ -169,6 +194,12 @@ export default async function handler(req, res) {
         duration_minutes: durationMinutes,
         status: 'closed'
       });
+
+      if (isRegNo) {
+        await postToIedc('/makerspace/checkout', {
+          membershipId: normalized
+        });
+      }
 
       return res.json({ ok: true, action: 'checked-out', id: doc.id, duration_minutes: durationMinutes });
     }
