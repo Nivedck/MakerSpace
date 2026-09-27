@@ -135,3 +135,21 @@ button:disabled{opacity:.55;cursor:not-allowed}
 /* Polished images */
 .card img{border-radius:10px;box-shadow:var(--shadow-sm);width:100%;height:auto}
 
+/* Loading bar animation */
+@keyframes loading-slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* QR Scanner */
+.qr-scanner-wrapper{border-radius:var(--radius);overflow:hidden;background:#000;min-height:280px;position:relative}
+.qr-scanner-wrapper #qr-reader-container{border-radius:var(--radius)}
+#qr-reader-container img[alt="Info icon"]{display:none}
+#qr-reader-container video{border-radius:var(--radius);object-fit:cover}
+#qr-reader__dashboard{padding:0!important}
+#qr-reader__dashboard button{background:linear-gradient(90deg,var(--primary),#7c3aed)!important;color:var(--primary-ink)!important;border:none!important;border-radius:10px!important;padding:10px 14px!important;font-weight:600!important;cursor:pointer!important;margin:8px 4px!important}
+#qr-reader__dashboard select{background:var(--input-bg)!important;color:var(--text)!important;border:1px solid var(--border-soft)!important;border-radius:10px!important;padding:8px!important}
+#qr-reader__dashboard span{color:var(--muted)!important}
+
+/* Tabs for mode toggle */
+.tabs{display:flex;gap:8px;background:transparent;padding:6px;border-radius:12px}
+.tab{padding:8px 12px;border-radius:8px;background:transparent;color:var(--muted);font-weight:600;cursor:pointer;border:1px solid var(--border-soft);font-size:0.95rem;transition:all 0.2s ease}
+.tab.active{background:linear-gradient(90deg,var(--primary),#7c3aed);color:var(--primary-ink);box-shadow:0 8px 24px rgba(37,99,235,0.12);border:1px solid var(--border-strong)}
+

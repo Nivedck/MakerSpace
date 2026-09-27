@@ -74,7 +74,7 @@ export default function Capture() {
       }
 
       const role = (user.role || 'student').toLowerCase();
-      const userType = role === 'student' ? 'student' : role === 'staff' ? 'staff' : 'guest';
+      const userType = (role === 'student' || role === 'execom') ? 'student' : role === 'staff' ? 'staff' : 'guest';
 
       const v = videoRef.current;
       const c = canvasRef.current;

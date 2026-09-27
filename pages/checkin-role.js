@@ -4,6 +4,7 @@ const roles = [
   { key: 'student', title: 'Student' },
   { key: 'staff', title: 'Staff'  },
   { key: 'guest', title: 'Guest' },
+  { key: 'execom', title: 'Execom' },
 ];
 
 export default function CheckinRole() {

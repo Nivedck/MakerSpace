@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const QrScanner = dynamic(() => import('../lib/components/QrScanner'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ textAlign: 'center', padding: '30px', color: 'var(--muted)' }}>
+      <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
+      <p>Loading scanner...</p>
+    </div>
+  )
+});
 
 export default function CheckIn() {
   const [id, setId] = useState('');
@@ -20,6 +31,8 @@ export default function CheckIn() {
   const [otpTarget, setOtpTarget] = useState('');
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [registering, setRegistering] = useState(false);
+  const [qrProcessing, setQrProcessing] = useState(false);
+  const [scannerKey, setScannerKey] = useState(0);
   const router = useRouter();
   const shouldConfirmLeave = stage === 'register';
   const leaveConfirmedRef = useRef(false);
@@ -107,10 +120,11 @@ export default function CheckIn() {
 
   const role = (() => {
     const val = (router.query.role || 'student').toString().toLowerCase();
-    return ['student', 'staff', 'guest'].includes(val) ? val : 'student';
+    return ['student', 'staff', 'guest', 'execom'].includes(val) ? val : 'student';
   })();
 
   const isStudent = role === 'student';
+  const isExecom = role === 'execom';
   const idPlaceholder = isStudent
     ? 'IEDC Membership ID (e.g., IEDC28CS029)'
     : role === 'staff'
@@ -516,12 +530,93 @@ export default function CheckIn() {
     router.push('/capture');
   }
 
+  async function handleQrScan(decodedText) {
+    if (qrProcessing) return;
+    setQrProcessing(true);
+    setErr('');
+
+    try {
+      const lookupResp = await fetch('/api/execom-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrLink: decodedText }),
+      });
+      const lookupData = await lookupResp.json();
+
+      if (!lookupResp.ok || !lookupData.success) {
+        setErr(lookupData.error || 'QR code not recognized');
+        setQrProcessing(false);
+        setScannerKey(k => k + 1);
+        return;
+      }
+
+      const membershipId = lookupData.membershipId;
+      setId(membershipId);
+
+      const memberResp = await fetch(`/api/iedc-member?id=${encodeURIComponent(membershipId)}`);
+      const memberData = await memberResp.json();
+
+      if (!memberResp.ok || !memberData?.success || !memberData.data) {
+        setErr('Member details not found. Please contact admin.');
+        setQrProcessing(false);
+        setScannerKey(k => k + 1);
+        return;
+      }
+
+      const member = {
+        ...memberData.data,
+        membershipId: memberData.data.membershipId || membershipId,
+        userType: 'execom'
+      };
+      setUser(member);
+      setStage('details');
+      setPurpose('');
+    } catch (e) {
+      setErr('Failed to process QR code. Try again.');
+      setScannerKey(k => k + 1);
+    }
+
+    setQrProcessing(false);
+  }
+
+  function proceedExecom() {
+    setErr('');
+    if (!purpose) {
+      setErr('Purpose is required');
+      return;
+    }
+    if (!user?.membershipId) {
+      setErr('Membership ID missing. Please restart check-in.');
+      return;
+    }
+    if (!user?.firstName) {
+      setErr('Name is missing. Please restart check-in.');
+      return;
+    }
+
+    const payload = {
+      ...user,
+      membershipId: user.membershipId,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      department: user.department || '',
+      organization: user.organization || '',
+      purpose,
+      role: 'execom',
+    };
+
+    sessionStorage.setItem('iedc_user', JSON.stringify(payload));
+    router.push('/capture');
+  }
+
   function resetFlow() {
     setUser(null);
     setPurpose('');
     setStage('lookup');
     setErr('');
     resetOtpState();
+    setScannerKey(k => k + 1);
   }
 
   function handleRegisterEmailChange(value) {
@@ -546,7 +641,32 @@ export default function CheckIn() {
           </div>
         </div>
 
-        {stage === 'lookup' && (
+        {stage === 'lookup' && isExecom && (
+          <div className="card stack">
+            <div className="subtitle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>📱</span> Scan your IEDC QR Code
+            </div>
+            <div className="muted">Point your camera at the QR code on your IEDC membership card</div>
+
+            {qrProcessing ? (
+              <LoadingBar label="Processing QR code..." />
+            ) : (
+              <QrScanner
+                key={scannerKey}
+                onScan={handleQrScan}
+                onError={(msg) => setErr(msg)}
+              />
+            )}
+
+            {err && <div className="error">{err}</div>}
+
+            <div className="footer-actions">
+              <Link href="/checkin-role" className="btn btn-outline">Back</Link>
+            </div>
+          </div>
+        )}
+
+        {stage === 'lookup' && !isExecom && (
           <form className="card stack" onSubmit={handleSubmit}>
             <input
               className="input"
@@ -738,7 +858,7 @@ export default function CheckIn() {
             <div className="subtitle">Membership Details</div>
             <div><b>Name:</b> {(user.firstName || form.firstName) || '—'} {(user.lastName || form.lastName) || ''}</div>
             <div><b>Membership ID:</b> {user.membershipId}</div>
-            {isStudent && (
+            {(isStudent || isExecom) && (
               <>
                 <div><b>Admission No:</b> {user.admissionNo}</div>
                 <div><b>Year of Admission:</b> {user.yearOfJoining}</div>
@@ -773,7 +893,7 @@ export default function CheckIn() {
             {err && <div className="error">{err}</div>}
 
             <div className="footer-actions">
-              <button className="btn btn-primary" onClick={continueToOtp} disabled={!purpose || otpSending}>Continue</button>
+              <button className="btn btn-primary" onClick={isExecom ? proceedExecom : continueToOtp} disabled={!purpose || (!isExecom && otpSending)}>{isExecom ? 'Proceed to Capture' : 'Continue'}</button>
               <button className="btn btn-outline" onClick={resetFlow}>Start Over</button>
             </div>
           </div>
