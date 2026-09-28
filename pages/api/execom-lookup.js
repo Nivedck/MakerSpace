@@ -67,12 +67,15 @@ export default async function handler(req, res) {
     const rows = await getSheetRows();
     const normalizedInput = qrLink.trim();
 
-    // Skip header row (index 0), search column A for matching link
-    for (let i = 1; i < rows.length; i++) {
+    // Search all rows — auto-skip header rows (non-URL values in column A)
+    for (let i = 0; i < rows.length; i++) {
       const colA = (rows[i][0] || '').trim();
       const colB = (rows[i][1] || '').trim();
 
-      if (colA && colA === normalizedInput) {
+      // Skip header rows or non-URL entries
+      if (!colA || !colA.startsWith('http')) continue;
+
+      if (colA === normalizedInput) {
         if (!colB) {
           return res.status(404).json({
             success: false,

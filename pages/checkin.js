@@ -536,12 +536,14 @@ export default function CheckIn() {
     setErr('');
 
     try {
+      console.log('[Execom QR] Scanned:', decodedText);
       const lookupResp = await fetch('/api/execom-lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrLink: decodedText }),
       });
       const lookupData = await lookupResp.json();
+      console.log('[Execom QR] Lookup response:', lookupData);
 
       if (!lookupResp.ok || !lookupData.success) {
         setErr(lookupData.error || 'QR code not recognized');
@@ -553,25 +555,31 @@ export default function CheckIn() {
       const membershipId = lookupData.membershipId;
       setId(membershipId);
 
-      const memberResp = await fetch(`/api/iedc-member?id=${encodeURIComponent(membershipId)}`);
-      const memberData = await memberResp.json();
+      // Try to fetch full member details, but proceed even if it fails
+      let member = { membershipId, userType: 'execom' };
+      try {
+        const memberResp = await fetch(`/api/iedc-member?id=${encodeURIComponent(membershipId)}`);
+        const memberData = await memberResp.json();
+        console.log('[Execom QR] Member response:', memberData);
 
-      if (!memberResp.ok || !memberData?.success || !memberData.data) {
-        setErr('Member details not found. Please contact admin.');
-        setQrProcessing(false);
-        setScannerKey(k => k + 1);
-        return;
+        if (memberResp.ok && memberData?.success && memberData.data) {
+          member = {
+            ...memberData.data,
+            membershipId: memberData.data.membershipId || membershipId,
+            userType: 'execom'
+          };
+        } else {
+          console.warn('[Execom QR] Member details unavailable, proceeding with ID only');
+        }
+      } catch (memberErr) {
+        console.warn('[Execom QR] Member fetch failed, proceeding with ID only:', memberErr);
       }
 
-      const member = {
-        ...memberData.data,
-        membershipId: memberData.data.membershipId || membershipId,
-        userType: 'execom'
-      };
       setUser(member);
       setStage('details');
       setPurpose('');
     } catch (e) {
+      console.error('[Execom QR] Failed:', e);
       setErr('Failed to process QR code. Try again.');
       setScannerKey(k => k + 1);
     }
@@ -589,15 +597,11 @@ export default function CheckIn() {
       setErr('Membership ID missing. Please restart check-in.');
       return;
     }
-    if (!user?.firstName) {
-      setErr('Name is missing. Please restart check-in.');
-      return;
-    }
 
     const payload = {
       ...user,
       membershipId: user.membershipId,
-      firstName: user.firstName || '',
+      firstName: user.firstName || user.membershipId,
       lastName: user.lastName || '',
       email: user.email || '',
       department: user.department || '',
@@ -648,15 +652,16 @@ export default function CheckIn() {
             </div>
             <div className="muted">Point your camera at the QR code on your IEDC membership card</div>
 
-            {qrProcessing ? (
+            {qrProcessing && (
               <LoadingBar label="Processing QR code..." />
-            ) : (
+            )}
+            <div style={{ display: qrProcessing ? 'none' : 'block' }}>
               <QrScanner
                 key={scannerKey}
                 onScan={handleQrScan}
                 onError={(msg) => setErr(msg)}
               />
-            )}
+            </div>
 
             {err && <div className="error">{err}</div>}
 
@@ -858,10 +863,10 @@ export default function CheckIn() {
             <div className="subtitle">Membership Details</div>
             <div><b>Name:</b> {(user.firstName || form.firstName) || '—'} {(user.lastName || form.lastName) || ''}</div>
             <div><b>Membership ID:</b> {user.membershipId}</div>
-            {(isStudent || isExecom) && (
+            {(isStudent || isExecom) && user.admissionNo && (
               <>
                 <div><b>Admission No:</b> {user.admissionNo}</div>
-                <div><b>Year of Admission:</b> {user.yearOfJoining}</div>
+                {user.yearOfJoining && <div><b>Year of Admission:</b> {user.yearOfJoining}</div>}
               </>
             )}
             {role === 'staff' && (

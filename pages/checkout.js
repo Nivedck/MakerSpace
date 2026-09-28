@@ -175,7 +175,7 @@ export default function Checkout() {
         <div className="card stack">
           <div className="muted">Point your camera at the QR code on your IEDC membership card</div>
 
-          {qrProcessing ? (
+          {qrProcessing && (
             <div style={{ width: '100%' }}>
               <div style={{
                 width: '100%',
@@ -195,13 +195,14 @@ export default function Checkout() {
                 Looking up your check-in...
               </p>
             </div>
-          ) : (
+          )}
+          <div style={{ display: qrProcessing ? 'none' : 'block' }}>
             <QrScanner
               key={scannerKey}
               onScan={handleQrScan}
               onError={(msg) => setErr(msg)}
             />
-          )}
+          </div>
 
           {err && <div className="error">{err}</div>}
 
