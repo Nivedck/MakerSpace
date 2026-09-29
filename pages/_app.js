@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import '../public/styles.css';
 import Layout from '../lib/components/Layout';
+import ErrorBoundary from '../lib/components/ErrorBoundary';
 import { ThemeProvider } from '../lib/context/ThemeContext';
 
 export default function App({ Component, pageProps }){
@@ -15,11 +16,14 @@ export default function App({ Component, pageProps }){
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
-      <ThemeProvider>
-        <Layout>
-          <Component {...pageProps} />
-        </Layout>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <Layout>
+            <Component {...pageProps} />
+          </Layout>
+        </ThemeProvider>
+      </ErrorBoundary>
     </>
   );
 }
+
